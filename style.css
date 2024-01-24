@@ -8,9 +8,10 @@
 
 body {
     font-family: 'Fredericka the Great', sans-serif;
+    overflow: hidden;
 }
 
-.core-container {
+/* .core-container {
     width: 100%;
     height: 100vh;
     background: linear-gradient(
@@ -19,5 +20,8 @@ body {
         url('./alexander-grey-WqPAETBU2G8-unsplash.jpg') no-repeat center;
     background-size: cover;
     color: khaki;
+} */
 
+canvas {
+    display: block
 }
