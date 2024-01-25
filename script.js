@@ -3,6 +3,7 @@ const PADDLE_SPEED = 0.5
 const BALL_SPEED = 0.45
 const BALL_SPIN = 0.2
 const WALL = 0.02
+const MIN_BOUNCE_ANGLE = 30
 const COLOUR_BG = 'darkgoldenrod'
 const COLOUR_WALL = 'orange'
 const COLOUR_PADDLE = 'darkred'
@@ -24,15 +25,27 @@ window.addEventListener('resize', setDimensions)
 
 function playGame() {
     requestAnimationFrame(playGame)
-    updatePaddle()
+    updatePaddle() 
+    updateBall()
     drawBackground()
     drawWalls()
     drawPaddle()
+    drawBall()
+}
+
+function applyBallSpeed(angle) {
+    ball.xV = ball.speed * Math.cos(angle)
+    ball.yV = -ball.speed * Math.sin(angle)
 }
 
 function drawBackground() {
     ConX.fillStyle = COLOUR_BG
     ConX.fillRect(0, 0, canvasEl.width, canvasEl.height)    
+}
+
+function drawBall() {
+    ConX.fillStyle = COLOUR_BALL
+    ConX.fillRect(ball.x - ball.w / 2, ball.y - ball.h / 2, ball.w, ball.h)
 }
 
 function drawPaddle() {
@@ -58,6 +71,9 @@ function drawWalls() {
 
 function keyDown(e) {
     switch (e.keyCode) {
+        case 32:
+            serveBall()
+            break
         case 37:
             movePaddle(DIRECTION.LEFT)
             break
@@ -92,6 +108,17 @@ function movePaddle(direction) {
 
 function newGame () {
     paddle = new Paddle(PADDLE_WIDTH, wall, PADDLE_SPEED)
+    ball = new Ball(wall, BALL_SPEED)
+}
+
+function serveBall() {
+    if (ball.yV != 0) {
+        return false
+    }
+    let minBounceAngle = (MIN_BOUNCE_ANGLE / 180) * Math.PI
+    let range = Math.PI - minBounceAngle * 2
+    let angle = Math.random() * range + minBounceAngle
+    applyBallSpeed(angle)
 }
 
 function setDimensions() {
@@ -102,6 +129,34 @@ function setDimensions() {
     canvasEl.height = height
 }
 
+function updateBall() {
+    ball.x += (ball.xV / 1000) * 15
+    ball.y += (ball.yV / 1000) * 15
+
+    if (ball.x < wall + ball.w / 2) {
+        ball.x = wall + ball.w / 2
+        ball.xV = -ball.xV
+        // spinBall()
+    } else if (ball.x > canvasEl.width - wall - ball.w / 2) {
+        ball.x = canvasEl.width - wall - ball.w / 2
+        ball.xV = -ball.xV
+        // spinBall()
+    } else if (ball.y < wall + ball.h / 2) {
+        ball.y = wall + ball.h / 2
+        ball.yV = -ball.yV
+        // spinBall()
+    }
+
+    if (ball.y > paddle.y - paddle.h * 0.5 - ball.h * 0.5 &&
+        ball.y < paddle.y + paddle.h * 0.5 &&
+        ball.x > paddle.x - paddle.w * 0.5 - ball.w * 0.5 &&
+        ball.x < paddle.x + paddle.w * 0.5) {
+        ball.y = paddle.y - paddle.h * 0.5 - ball.h * 0.5
+        ball.yV = -ball.yV
+        }
+
+}
+
 function updatePaddle() {
     let lastPaddleX = paddle.x
     paddle.x += (paddle.xV / 1000) * 20
@@ -110,6 +165,18 @@ function updatePaddle() {
     } else if (paddle.x > canvasEl.width - wall - paddle.w / 2) {
         paddle.x = canvasEl.width - wall - paddle.w / 2
 
+    }
+}
+
+class Ball {
+    constructor(ballSize, ballSpeed) {
+        this.w = ballSize
+        this.h = ballSize
+        this.x = paddle.x
+        this.y = paddle.y - paddle.h / 2 - this.h / 2
+        this.speed = ballSpeed * height
+        this.xV = 0
+        this.yV = 0
     }
 }
 
