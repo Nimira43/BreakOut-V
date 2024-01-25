@@ -154,7 +154,6 @@ function updateBall() {
         ball.y = paddle.y - paddle.h * 0.5 - ball.h * 0.5
         ball.yV = -ball.yV
         }
-
 }
 
 function updatePaddle() {
