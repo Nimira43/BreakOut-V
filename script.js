@@ -4,10 +4,15 @@ const BALL_SPEED = 0.45
 const BALL_SPIN = 0.2
 const WALL = 0.02
 const MIN_BOUNCE_ANGLE = 30
-const COLOUR_BG = 'darkgoldenrod'
-const COLOUR_WALL = 'orange'
-const COLOUR_PADDLE = 'darkred'
-const COLOUR_BALL = 'black'
+const BRICK_ROWS = 8
+const BRICK_COLS = 14
+const BRICK_GAP = 0.3
+const MARGIN = 4
+const MAX_LEVEL = 10
+const COLOUR_BG = 'blue'
+const COLOUR_WALL = 'black'
+const COLOUR_PADDLE = 'yellow'
+const COLOUR_BALL = 'white'
 const DIRECTION = {
     LEFT: 0,
     RIGHT: 1,
@@ -18,7 +23,7 @@ let canvasEl = document.createElement('canvas')
 document.body.appendChild(canvasEl)
 const ConX = canvasEl.getContext('2d')
 let width, height, wall
-let paddle, ball, touchX
+let paddle, ball, touchX, bricks = [], level
 
 canvasEl.addEventListener('touchcancel', touchCancel)
 canvasEl.addEventListener('touchend', touchEnd)
@@ -36,6 +41,7 @@ function playGame() {
     drawBackground()
     drawWalls()
     drawPaddle()
+    drawBricks()
     drawBall()
 }
 
@@ -49,6 +55,35 @@ function applyBallSpeed(angle) {
     ball.yV = -ball.speed * Math.sin(angle)
 }
 
+function createBricks() {
+    let minY = wall
+    let maxY = ball.y - ball.h * 3.5
+    let totalSpaceY = maxY - minY
+    let totalRows = MARGIN + BRICK_ROWS + MAX_LEVEL * 2
+    let rowH = (totalSpaceY / totalRows) * 0.9
+    let gap = wall * BRICK_GAP * 0.9
+    let h = rowH - gap
+    let totalSpaceX = width - wall * 2
+    let colW = (totalSpaceX - gap) / BRICK_COLS
+    let w = colW - gap
+    bricks = []
+    let cols = BRICK_COLS
+    let rows = BRICK_ROWS + level * 2 
+    let colour, left, rank, rankHigh, score, spdMult, top
+
+    rankHigh = rows / 2 - 1
+    for (let i = 0; i < rows; i++) {
+        bricks[i] = []
+        rank = Math.floor(i / 2)
+        colour = getBrickColour(rank, rankHigh)
+        top = wall + (MARGIN + i) * rowH
+        for (let j = 0; j < cols; j++) {
+            left = wall + gap + j * colW
+            bricks[i][j] = new Brick(left, top, w, h, colour)
+        }
+    }
+}
+
 function drawBackground() {
     ConX.fillStyle = COLOUR_BG
     ConX.fillRect(0, 0, canvasEl.width, canvasEl.height)    
@@ -57,6 +92,15 @@ function drawBackground() {
 function drawBall() {
     ConX.fillStyle = COLOUR_BALL
     ConX.fillRect(ball.x - ball.w / 2, ball.y - ball.h / 2, ball.w, ball.h)
+}
+
+function drawBricks() {
+    for (let row of bricks) {
+        for (let brick of row) {
+            ConX.fillStyle = brick.colour
+            ConX.fillRect(brick.left, brick.top, brick.w, brick.h)
+        }
+    }
 }
 
 function drawPaddle() {
@@ -78,6 +122,20 @@ function drawWalls() {
     ConX.lineTo(width - halfWall, halfWall)
     ConX.lineTo(width - halfWall, height)
     ConX.stroke()
+}
+
+function getBrickColour(rank, highestRank) {
+    let fraction = rank / highestRank
+    let r, g, b = 0
+    if (fraction <= 0.67) {
+        r = 255;
+        g = (255 * fraction) / 0.67
+
+    } else {
+        r = (255 * (1 - fraction)) / 0.66
+        g = 255
+    }
+    return `rgb(${r}, ${g}, ${b})`
 }
 
 function keyDown(e) {
@@ -120,6 +178,8 @@ function movePaddle(direction) {
 function newGame () {
     paddle = new Paddle(PADDLE_WIDTH, wall, PADDLE_SPEED)
     ball = new Ball(wall, BALL_SPEED)
+    level = 0
+    createBricks()
 }
 
 function serveBall() {
@@ -225,6 +285,20 @@ class Ball {
         this.speed = ballSpeed * height
         this.xV = 0
         this.yV = 0
+    }
+}
+
+class Brick {
+    constructor(left, top, w, h, colour, score, spdMult) {
+        this.w = w
+        this.h = h
+        this.left = left
+        this.top = top
+        this.bottom = top + h
+        this.right = left + w
+        this.colour = colour
+        // this.score = score
+        // this.spdMult = spdMult
     }
 }
 
