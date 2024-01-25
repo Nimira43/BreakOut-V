@@ -19,6 +19,11 @@ const ConX = canvasEl.getContext('2d')
 let width, height, wall
 let paddle, ball, touchX
 
+canvasEl.addEventListener('touchcancel', touchCancel)
+canvasEl.addEventListener('touchend', touchEnd)
+canvasEl.addEventListener('touchmove', touchMove, { passive: true })
+canvasEl.addEventListener('touchstart', touchStart, { passive: true })
+
 document.addEventListener('keydown', keyDown)
 document.addEventListener('keyup', keyUp)
 window.addEventListener('resize', setDimensions)
@@ -34,6 +39,11 @@ function playGame() {
 }
 
 function applyBallSpeed(angle) {
+    if (angle < Math.PI / 6) {
+        angle = Math.PI / 6
+    } else if (angle > (Math.PI * 5) / 6) {
+        angle = (Math.PI * 5) / 6
+    }
     ball.xV = ball.speed * Math.cos(angle)
     ball.yV = -ball.speed * Math.sin(angle)
 }
@@ -119,6 +129,11 @@ function serveBall() {
     let range = Math.PI - minBounceAngle * 2
     let angle = Math.random() * range + minBounceAngle
     applyBallSpeed(angle)
+    return true
+}
+
+function outOfBounds() {
+    newGame()
 }
 
 function setDimensions() {
@@ -127,6 +142,35 @@ function setDimensions() {
     wall = WALL * (height < width ? height : width)
     canvasEl.width = width
     canvasEl.height = height
+}
+
+function touch(x) {
+    if (!x) {
+        movePaddle(DIRECTION.STOP)
+    } else if (x > paddle.x) {
+        movePaddle(DIRECTION.RIGHT)
+    } else if (x < paddle.x) {
+        movePaddle(DIRECTION.LEFT)
+    }
+}
+
+function touchCancel(e) {
+    touch(null)
+}
+
+function touchEnd(e) {
+    touch(null)
+}
+
+function touchMove(e) {
+    touch(e.touches[0].clientX)
+}
+
+function touchStart(e) {
+    if (serveBall()) {
+        return
+    }
+    touch(e.touches[0].clientX)
 }
 
 function updateBall() {
@@ -148,12 +192,19 @@ function updateBall() {
     }
 
     if (ball.y > paddle.y - paddle.h * 0.5 - ball.h * 0.5 &&
-        ball.y < paddle.y + paddle.h * 0.5 &&
+        ball.y < paddle.y + paddle.h * 0.5 + ball.h * 0.5 &&
         ball.x > paddle.x - paddle.w * 0.5 - ball.w * 0.5 &&
-        ball.x < paddle.x + paddle.w * 0.5) {
+        ball.x < paddle.x + paddle.w * 0.5 + ball.w * 0.5) {
         ball.y = paddle.y - paddle.h * 0.5 - ball.h * 0.5
-        ball.yV = -ball.yV
-        }
+        ball.yV, -ball.yV
+        let angle = Math.atan2(-ball.yV, ball.xV)
+        angle += ((Math.random() * Math.PI) / 2 - Math.PI / 4) * BALL_SPIN
+        applyBallSpeed(angle)
+    }
+
+    if (ball.y > canvasEl.height) {
+        outOfBounds()
+    }
 }
 
 function updatePaddle() {
@@ -163,7 +214,6 @@ function updatePaddle() {
         paddle.x = wall + paddle.w / 2
     } else if (paddle.x > canvasEl.width - wall - paddle.w / 2) {
         paddle.x = canvasEl.width - wall - paddle.w / 2
-
     }
 }
 
