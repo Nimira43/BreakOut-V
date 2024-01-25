@@ -3,12 +3,12 @@ const PADDLE_SPEED = 0.5
 const BALL_SPEED = 0.45
 const BALL_SPIN = 0.2
 const WALL = 0.02
-const MIN_BOUNCE_ANGLE = 30
 const BRICK_ROWS = 8
 const BRICK_COLS = 14
 const BRICK_GAP = 0.3
 const MARGIN = 4
 const MAX_LEVEL = 10
+const MIN_BOUNCE_ANGLE = 30
 const COLOUR_BG = 'blue'
 const COLOUR_WALL = 'black'
 const COLOUR_PADDLE = 'yellow'
@@ -38,6 +38,7 @@ function playGame() {
     requestAnimationFrame(playGame)
     updatePaddle() 
     updateBall()
+    updateBricks()
     drawBackground()
     drawWalls()
     drawPaddle()
@@ -46,11 +47,7 @@ function playGame() {
 }
 
 function applyBallSpeed(angle) {
-    if (angle < Math.PI / 6) {
-        angle = Math.PI / 6
-    } else if (angle > (Math.PI * 5) / 6) {
-        angle = (Math.PI * 5) / 6
-    }
+    
     ball.xV = ball.speed * Math.cos(angle)
     ball.yV = -ball.speed * Math.sin(angle)
 }
@@ -97,6 +94,9 @@ function drawBall() {
 function drawBricks() {
     for (let row of bricks) {
         for (let brick of row) {
+            if (brick == null) {
+                continue
+            }
             ConX.fillStyle = brick.colour
             ConX.fillRect(brick.left, brick.top, brick.w, brick.h)
         }
@@ -206,6 +206,27 @@ function setDimensions() {
     newGame()
 }
 
+function spinBall() {
+    let upwards = ball.yV < 0
+    let angle = Math.atan2(-ball.yV, ball.xV)
+    angle += ((Math.random() * Math.PI) / 2 - Math.PI / 4) * BALL_SPIN
+    let minBounceAngle = (MIN_BOUNCE_ANGLE / 180) * Math.PI 
+    if (upwards) {
+        if (angle < minBounceAngle) {
+            angle = minBounceAngle
+        } else if (angle > Math.PI - minBounceAngle) {
+            angle = Math.PI - minBounceAngle
+        }
+    } else {
+        if (angle > -minBounceAngle) {
+            angle = -minBounceAngle
+        } else if (angle < -Math.PI + minBounceAngle) {
+            angle = -Math.PI + minBounceAngle            
+        }
+    }
+    applyBallSpeed(angle)
+}
+
 function touchCancel() {
     touchX = null
     movePaddle(DIRECTION.STOP)
@@ -233,28 +254,47 @@ function updateBall() {
     if (ball.x < wall + ball.w / 2) {
         ball.x = wall + ball.w / 2
         ball.xV = -ball.xV
+        spinBall()
     } else if (ball.x > canvasEl.width - wall - ball.w / 2) {
         ball.x = canvasEl.width - wall - ball.w / 2
         ball.xV = -ball.xV
+        spinBall()
     } else if (ball.y < wall + ball.h / 2) {
         ball.y = wall + ball.h / 2
         ball.yV = -ball.yV
+        spinBall()
     }
     if (ball.y > paddle.y - paddle.h * 0.5 - ball.h * 0.5 &&
         ball.y < paddle.y + paddle.h * 0.5 + ball.h * 0.5 &&
         ball.x > paddle.x - paddle.w * 0.5 - ball.w * 0.5 &&
         ball.x < paddle.x + paddle.w * 0.5 + ball.w * 0.5) {
         ball.y = paddle.y - paddle.h * 0.5 - ball.h * 0.5
-        ball.yV, -ball.yV
-        let angle = Math.atan2(-ball.yV, ball.xV)
-        angle += ((Math.random() * Math.PI) / 2 - Math.PI / 4) * BALL_SPIN
-        applyBallSpeed(angle)
+        ball.yV = -ball.yV
+        spinBall()
     }
     if (ball.y > canvasEl.height) {
         outOfBounds()
     }
     if (ball.yV == 0) {
         ball.x = paddle.x
+    }
+}
+
+function updateBricks() {
+    OUTER: for (let i = 0; i < bricks.length; i++) {
+        for (let j = 0; j < BRICK_COLS; j++) {
+            if (bricks[i][j] != null && bricks[i][j].intersect(ball)) {
+                if (ball.yV < 0) {
+                    ball.y = bricks[i][j].bottom + ball.h * 0.5
+                } else {
+                    ball.y = bricks[i][j].top - ball.h * 0.5
+                }
+                bricks[i][j] = null
+                ball.yV = -ball.yV
+                spinBall()
+                break OUTER
+            }
+        }
     }
 }
 
@@ -297,8 +337,20 @@ class Brick {
         this.bottom = top + h
         this.right = left + w
         this.colour = colour
-        // this.score = score
-        // this.spdMult = spdMult
+        this.score = score
+        this.spdMult = spdMult
+        this.intersect = (ball) => {
+            let ballBottom = ball.y + ball.h * 0.5
+            let ballLeft = ball.x - ball.w * 0.5
+            let ballRight = ball.x + ball.w * 0.5
+            let ballTop = ball.y - ball.h * 0.5
+            return (
+                this.left < ballRight &&
+                ballLeft < this.right &&
+                this.bottom > ballTop &&
+                ballBottom > this.top
+                )
+        }
     }
 }
 
