@@ -13,6 +13,7 @@ const DIRECTION = {
     RIGHT: 1,
     STOP: 2,
 }
+
 let canvasEl = document.createElement('canvas')
 document.body.appendChild(canvasEl)
 const ConX = canvasEl.getContext('2d')
@@ -142,55 +143,43 @@ function setDimensions() {
     wall = WALL * (height < width ? height : width)
     canvasEl.width = width
     canvasEl.height = height
+    newGame()
 }
 
-function touch(x) {
-    if (!x) {
-        movePaddle(DIRECTION.STOP)
-    } else if (x > paddle.x) {
-        movePaddle(DIRECTION.RIGHT)
-    } else if (x < paddle.x) {
-        movePaddle(DIRECTION.LEFT)
-    }
+function touchCancel() {
+    touchX = null
+    movePaddle(DIRECTION.STOP)
 }
 
-function touchCancel(e) {
-    touch(null)
-}
-
-function touchEnd(e) {
-    touch(null)
+function touchEnd() {
+    touchX = null
+    movePaddle(DIRECTION.STOP)
 }
 
 function touchMove(e) {
-    touch(e.touches[0].clientX)
+    touchX = e.touches[0].clientX
 }
 
 function touchStart(e) {
     if (serveBall()) {
         return
     }
-    touch(e.touches[0].clientX)
+    touchX = e.touches[0].clientX
 }
 
 function updateBall() {
     ball.x += (ball.xV / 1000) * 15
     ball.y += (ball.yV / 1000) * 15
-
     if (ball.x < wall + ball.w / 2) {
         ball.x = wall + ball.w / 2
         ball.xV = -ball.xV
-        // spinBall()
     } else if (ball.x > canvasEl.width - wall - ball.w / 2) {
         ball.x = canvasEl.width - wall - ball.w / 2
         ball.xV = -ball.xV
-        // spinBall()
     } else if (ball.y < wall + ball.h / 2) {
         ball.y = wall + ball.h / 2
         ball.yV = -ball.yV
-        // spinBall()
     }
-
     if (ball.y > paddle.y - paddle.h * 0.5 - ball.h * 0.5 &&
         ball.y < paddle.y + paddle.h * 0.5 + ball.h * 0.5 &&
         ball.x > paddle.x - paddle.w * 0.5 - ball.w * 0.5 &&
@@ -201,14 +190,24 @@ function updateBall() {
         angle += ((Math.random() * Math.PI) / 2 - Math.PI / 4) * BALL_SPIN
         applyBallSpeed(angle)
     }
-
     if (ball.y > canvasEl.height) {
         outOfBounds()
+    }
+    if (ball.yV == 0) {
+        ball.x = paddle.x
     }
 }
 
 function updatePaddle() {
-    let lastPaddleX = paddle.x
+    if (touchX != null) {
+        if (touchX > paddle.x + wall) {
+            movePaddle(DIRECTION.RIGHT)
+        } else if (touchX < paddle.x - wall) {
+            movePaddle(DIRECTION.LEFT)
+        } else {
+            movePaddle(DIRECTION.STOP)
+        }
+    }
     paddle.x += (paddle.xV / 1000) * 20
     if (paddle.x < wall + paddle.w / 2) {
         paddle.x = wall + paddle.w / 2
@@ -239,6 +238,6 @@ class Paddle {
         this.xV = 0
     }
 }
+
 setDimensions()
-newGame()
 playGame()
