@@ -11,6 +11,7 @@ const MAX_LEVEL = 10
 const MIN_BOUNCE_ANGLE = 30
 const GAMES_LIVES = 3
 const KEY_SCORE = 'HighScore'
+const BALL_SPEED_MAX = 2
 const COLOUR_BG = 'blue'
 const COLOUR_WALL = 'black'
 const COLOUR_PADDLE = 'yellow'
@@ -50,9 +51,12 @@ window.addEventListener('resize', setDimensions)
 
 function playGame() {
     requestAnimationFrame(playGame)
-    updatePaddle() 
-    updateBall()
-    updateBricks()
+    if (!gameOver) {
+        updatePaddle() 
+        updateBall()
+        updateBricks()
+    }
+    
     drawBackground()
     drawWalls()
     drawPaddle()
@@ -75,9 +79,7 @@ function createBricks() {
     let rowH = (totalSpaceY / totalRows) * 0.9
     let gap = wall * BRICK_GAP * 0.9
     let h = rowH - gap
-
     textSize = rowH * MARGIN * 0.45
-
     let totalSpaceX = width - wall * 2
     let colW = (totalSpaceX - gap) / BRICK_COLS
     let w = colW - gap
@@ -85,13 +87,14 @@ function createBricks() {
     let cols = BRICK_COLS
     let rows = BRICK_ROWS + level * 2 
     let colour, left, rank, rankHigh, score, spdMult, top
-
+    numBricks = cols * rows
     rankHigh = rows / 2 - 1
     for (let i = 0; i < rows; i++) {
         bricks[i] = []
         rank = Math.floor(i / 2)
         score = (rankHigh - rank) * 2 + 1
         colour = getBrickColour(rank, rankHigh)
+        spdMult = 1 + ((rankHigh - rank) / rankHigh) * (BALL_SPEED_MAX - 1)
         top = wall + (MARGIN + i) * rowH
         for (let j = 0; j < cols; j++) {
             left = wall + gap + j * colW
@@ -162,6 +165,13 @@ function drawText() {
     ConX.fillText(level, x3, yValue, maxWidth3)
     ConX.textAlign = 'right'
     ConX.fillText(scoreHigh, x4, yValue, maxWidth4)
+
+    if (gameOver) {
+        let text = win ? TEXT_WIN : TEXT_GAME_OVER
+        ConX.font = `${textSize * 2}px ${TEXT_FONT}`
+        ConX.textAlign = 'center'
+        ConX.fillText(text, width / 2, paddle.y - textSize * 2, maxWidth)
+    }
 }
 
 function drawWalls() {
@@ -194,6 +204,9 @@ function keyDown(e) {
     switch (e.keyCode) {
         case 32:
             serveBall()
+            if (gameOver) {
+                newGame()
+            }
             break
         case 37:
             movePaddle(DIRECTION.LEFT)
@@ -320,6 +333,9 @@ function touchMove(e) {
 
 function touchStart(e) {
     if (serveBall()) {
+        if (gameOver) {
+            newGame()
+        }
         return
     }
     touchX = e.touches[0].clientX
@@ -362,6 +378,7 @@ function updateBricks() {
         for (let j = 0; j < BRICK_COLS; j++) {
             if (bricks[i][j] != null && bricks[i][j].intersect(ball)) {
                 updateScore(bricks[i][j].score)
+                ball.setSpeed(bricks[i][j].spdMult)
                 if (ball.yV < 0) {
                     ball.y = bricks[i][j].bottom + ball.h * 0.5
                 } else {
@@ -369,9 +386,20 @@ function updateBricks() {
                 }
                 bricks[i][j] = null
                 ball.yV = -ball.yV
+                numBricks--
                 spinBall()
                 break OUTER
             }
+        }
+    }
+    if (numBricks == 0) {
+        if (level < MAX_LEVEL) {
+            level++
+            newLevel()
+        } else {
+            gameOver = true
+            win = true
+            newBall()
         }
     }
 }
@@ -411,6 +439,9 @@ class Ball {
         this.speed = ballSpeed * height
         this.xV = 0
         this.yV = 0
+    }
+    setSpeed = (spdMult) => {
+        this.speed = Math.max(this.speed, BALL_SPEED * height * spdMult)
     }
 }
 
