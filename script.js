@@ -9,10 +9,21 @@ const BRICK_GAP = 0.3
 const MARGIN = 4
 const MAX_LEVEL = 10
 const MIN_BOUNCE_ANGLE = 30
+const GAMES_LIVES = 3
+const KEY_SCORE = 'HighScore'
 const COLOUR_BG = 'blue'
 const COLOUR_WALL = 'black'
 const COLOUR_PADDLE = 'yellow'
 const COLOUR_BALL = 'white'
+const COLOUR_TEXT = 'white'
+const TEXT_FONT = 'sans-serif'
+const TEXT_LEVEL = 'Level'
+const TEXT_LIVES = 'Lives'
+const TEXT_SCORE = 'Score'
+const TEXT_SCORE_HIGH = 'High'
+const TEXT_GAME_OVER = 'GAME OVER'
+const TEXT_WIN = 'YOU WON'
+
 const DIRECTION = {
     LEFT: 0,
     RIGHT: 1,
@@ -23,7 +34,10 @@ let canvasEl = document.createElement('canvas')
 document.body.appendChild(canvasEl)
 const ConX = canvasEl.getContext('2d')
 let width, height, wall
-let paddle, ball, touchX, bricks = [], level
+let paddle, ball, bricks = []
+let gameOver, pupExtension, pupSticky, pupSuper, win
+let level, lives, score, scoreHigh
+let numBricks, textSize, touchX
 
 canvasEl.addEventListener('touchcancel', touchCancel)
 canvasEl.addEventListener('touchend', touchEnd)
@@ -43,6 +57,7 @@ function playGame() {
     drawWalls()
     drawPaddle()
     drawBricks()
+    drawText()
     drawBall()
 }
 
@@ -60,6 +75,9 @@ function createBricks() {
     let rowH = (totalSpaceY / totalRows) * 0.9
     let gap = wall * BRICK_GAP * 0.9
     let h = rowH - gap
+
+    textSize = rowH * MARGIN * 0.45
+
     let totalSpaceX = width - wall * 2
     let colW = (totalSpaceX - gap) / BRICK_COLS
     let w = colW - gap
@@ -72,11 +90,12 @@ function createBricks() {
     for (let i = 0; i < rows; i++) {
         bricks[i] = []
         rank = Math.floor(i / 2)
+        score = (rankHigh - rank) * 2 + 1
         colour = getBrickColour(rank, rankHigh)
         top = wall + (MARGIN + i) * rowH
         for (let j = 0; j < cols; j++) {
             left = wall + gap + j * colW
-            bricks[i][j] = new Brick(left, top, w, h, colour)
+            bricks[i][j] = new Brick(left, top, w, h, colour, score, spdMult)
         }
     }
 }
@@ -110,6 +129,39 @@ function drawPaddle() {
         paddle.y - paddle.h / 2,
         paddle.w,
         paddle.h)
+}
+
+function drawText() {
+    ConX.fillStyle = COLOUR_TEXT
+    let labelSize = textSize * 0.5
+    let margin = wall * 2
+    let maxWidth = width - margin * 2
+    let maxWidth1 = maxWidth * 0.27
+    let maxWidth2 = maxWidth * 0.2
+    let maxWidth3 = maxWidth * 0.2
+    let maxWidth4 = maxWidth * 0.27
+    let x1 = margin
+    let x2 = width * 0.4
+    let x3 = width * 0.6
+    let x4 = width - margin
+    let yLabel = wall + labelSize
+    let yValue = yLabel + textSize * 0.9
+    ConX.font = `${labelSize}px ${TEXT_FONT}`
+    ConX.textAlign = 'left'
+    ConX.fillText(TEXT_SCORE, x1, yLabel, maxWidth1)
+    ConX.textAlign = 'center'
+    ConX.fillText(TEXT_LIVES, x2, yLabel, maxWidth2)
+    ConX.fillText(TEXT_LEVEL, x3, yLabel, maxWidth3)
+    ConX.textAlign = 'right'
+    ConX.fillText(TEXT_SCORE_HIGH, x4, yLabel, maxWidth4)
+    ConX.font = `${textSize}px ${TEXT_FONT}`
+    ConX.textAlign = 'left'
+    ConX.fillText(score, x1, yValue, maxWidth1)
+    ConX.textAlign = 'center'
+    ConX.fillText(`${lives}/${GAMES_LIVES}`, x2, yValue, maxWidth2)
+    ConX.fillText(level, x3, yValue, maxWidth3)
+    ConX.textAlign = 'right'
+    ConX.fillText(scoreHigh, x4, yValue, maxWidth4)
 }
 
 function drawWalls() {
@@ -175,11 +227,38 @@ function movePaddle(direction) {
     }
 }
 
-function newGame () {
+function newBall() {
     paddle = new Paddle(PADDLE_WIDTH, wall, PADDLE_SPEED)
     ball = new Ball(wall, BALL_SPEED)
+}
+
+function newGame() {
     level = 0
+    gameOver = false
+    score = 0
+    win = false
+    lives = GAMES_LIVES
+    let scoreStr = localStorage.getItem(KEY_SCORE)
+    if (scoreStr == null) {
+        scoreHigh = 0
+    } else {
+        scoreHigh = parseInt(scoreStr)
+    }
+    newLevel()
+}
+
+function newLevel() {
+    touchX = null
+    newBall()
     createBricks()
+} 
+    
+function outOfBounds() {
+    lives--
+    if (lives == 0) {
+        gameOver = true
+    }
+    newBall()
 }
 
 function serveBall() {
@@ -193,16 +272,14 @@ function serveBall() {
     return true
 }
 
-function outOfBounds() {
-    newGame()
-}
-
 function setDimensions() {
     height = window.innerHeight
     width = window.innerWidth
     wall = WALL * (height < width ? height : width)
     canvasEl.width = width
     canvasEl.height = height
+    ConX.textBaseline = 'middle'
+
     newGame()
 }
 
@@ -284,6 +361,7 @@ function updateBricks() {
     OUTER: for (let i = 0; i < bricks.length; i++) {
         for (let j = 0; j < BRICK_COLS; j++) {
             if (bricks[i][j] != null && bricks[i][j].intersect(ball)) {
+                updateScore(bricks[i][j].score)
                 if (ball.yV < 0) {
                     ball.y = bricks[i][j].bottom + ball.h * 0.5
                 } else {
@@ -313,6 +391,14 @@ function updatePaddle() {
         paddle.x = wall + paddle.w / 2
     } else if (paddle.x > canvasEl.width - wall - paddle.w / 2) {
         paddle.x = canvasEl.width - wall - paddle.w / 2
+    }
+}
+
+function updateScore(brickScore) {
+    score += brickScore
+    if (score > scoreHigh) {
+        scoreHigh = score
+        localStorage.setItem(KEY_SCORE, scoreHigh)
     }
 }
 
