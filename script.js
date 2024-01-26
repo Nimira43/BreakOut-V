@@ -34,6 +34,10 @@ const DIRECTION = {
 let canvasEl = document.createElement('canvas')
 document.body.appendChild(canvasEl)
 const ConX = canvasEl.getContext('2d')
+let audBrick = new Audio('audio/brick.m4a')
+let audPaddle = new Audio('audio/paddle.m4a')
+let audPowerup = new Audio('audio/powerup.m4a')
+let audWall = new Audio('audio/wall.m4a')
 let width, height, wall
 let paddle, ball, bricks = []
 let gameOver, pupExtension, pupSticky, pupSuper, win
@@ -282,6 +286,7 @@ function serveBall() {
     let range = Math.PI - minBounceAngle * 2
     let angle = Math.random() * range + minBounceAngle
     applyBallSpeed(angle)
+    audPaddle.play()
     return true
 }
 
@@ -347,14 +352,17 @@ function updateBall() {
     if (ball.x < wall + ball.w / 2) {
         ball.x = wall + ball.w / 2
         ball.xV = -ball.xV
+        audWall.play()
         spinBall()
     } else if (ball.x > canvasEl.width - wall - ball.w / 2) {
         ball.x = canvasEl.width - wall - ball.w / 2
         ball.xV = -ball.xV
+        audWall.play()
         spinBall()
     } else if (ball.y < wall + ball.h / 2) {
         ball.y = wall + ball.h / 2
         ball.yV = -ball.yV
+        audWall.play()
         spinBall()
     }
     if (ball.y > paddle.y - paddle.h * 0.5 - ball.h * 0.5 &&
@@ -363,6 +371,7 @@ function updateBall() {
         ball.x < paddle.x + paddle.w * 0.5 + ball.w * 0.5) {
         ball.y = paddle.y - paddle.h * 0.5 - ball.h * 0.5
         ball.yV = -ball.yV
+        audPaddle.play()
         spinBall()
     }
     if (ball.y > canvasEl.height) {
@@ -387,6 +396,7 @@ function updateBricks() {
                 bricks[i][j] = null
                 ball.yV = -ball.yV
                 numBricks--
+                audBrick.play()
                 spinBall()
                 break OUTER
             }
