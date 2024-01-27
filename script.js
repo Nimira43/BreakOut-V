@@ -12,6 +12,9 @@ const MIN_BOUNCE_ANGLE = 30
 const GAMES_LIVES = 3
 const KEY_SCORE = 'HighScore'
 const BALL_SPEED_MAX = 2
+const PUP_CHANCE = 0.1
+const PUP_SPEED = 0.15
+const PUP_BONUS = 50
 const COLOUR_BG = 'blue'
 const COLOUR_WALL = 'black'
 const COLOUR_PADDLE = 'yellow'
@@ -22,13 +25,19 @@ const TEXT_LEVEL = 'Level'
 const TEXT_LIVES = 'Lives'
 const TEXT_SCORE = 'Score'
 const TEXT_SCORE_HIGH = 'High'
-const TEXT_GAME_OVER = 'GAME OVER'
-const TEXT_WIN = 'YOU WON'
+const TEXT_GAME_OVER = 'You are dead'
+const TEXT_WIN = 'You win'
 
 const DIRECTION = {
     LEFT: 0,
     RIGHT: 1,
     STOP: 2,
+}
+const PupType = {
+    EXTENSION: { colour: 'darkred', symbol: 'X' },
+    LIFE: { colour: 'pink', symbol: 'L'},
+    STICKY: { colour: 'sienna', symbol: '*'},
+    SUPER: { colour: 'green', symbol: 'S'},
 }
 
 let canvasEl = document.createElement('canvas')
@@ -39,7 +48,7 @@ let audPaddle = new Audio('audio/paddle.m4a')
 let audPowerup = new Audio('audio/powerup.m4a')
 let audWall = new Audio('audio/wall.m4a')
 let width, height, wall
-let paddle, ball, bricks = []
+let paddle, ball, bricks = [], pups = []
 let gameOver, pupExtension, pupSticky, pupSuper, win
 let level, lives, score, scoreHigh
 let numBricks, textSize, touchX
@@ -59,10 +68,12 @@ function playGame() {
         updatePaddle() 
         updateBall()
         updateBricks()
+        updatePups()
     }
     
     drawBackground()
     drawWalls()
+    drawPups()
     drawPaddle()
     drawBricks()
     drawText()
@@ -113,7 +124,7 @@ function drawBackground() {
 }
 
 function drawBall() {
-    ConX.fillStyle = COLOUR_BALL
+    ConX.fillStyle = pupSuper ? PupType.SUPER.colour : COLOUR_BALL
     ConX.fillRect(ball.x - ball.w / 2, ball.y - ball.h / 2, ball.w, ball.h)
 }
 
@@ -130,12 +141,29 @@ function drawBricks() {
 }
 
 function drawPaddle() {
-    ConX.fillStyle = COLOUR_PADDLE
+    ConX.fillStyle =  pupSticky ? PupType.STICKY.colour : COLOUR_PADDLE
     ConX.fillRect(
         paddle.x - paddle.w * 0.5,
         paddle.y - paddle.h / 2,
         paddle.w,
         paddle.h)
+}
+
+function drawPups() {
+    ConX.lineWidth = wall * 0.4
+    for (let pup of pups) {
+        ConX.fillStyle = pup.type.colour
+        ConX.strokeStyle = pup.type.colour
+        ConX.strokeRect(
+            pup.x - pup.w * 0.5,
+            pup.y - pup.h * 0.5,
+            pup.w,
+            pup.h
+        )
+        ConX.font = `bold ${pup.h}px ${TEXT_FONT}`
+        ConX.textAlign = 'center'
+        ConX.fillText(pup.type.symbol, pup.x, pup.y)
+    }
 }
 
 function drawText() {
@@ -245,6 +273,9 @@ function movePaddle(direction) {
 }
 
 function newBall() {
+    pupExtension = false
+    pupSticky = false
+    pupSuper = false
     paddle = new Paddle(PADDLE_WIDTH, wall, PADDLE_SPEED)
     ball = new Ball(wall, BALL_SPEED)
 }
@@ -265,6 +296,7 @@ function newGame() {
 }
 
 function newLevel() {
+    pups = []
     touchX = null
     newBall()
     createBricks()
@@ -285,7 +317,7 @@ function serveBall() {
     let minBounceAngle = (MIN_BOUNCE_ANGLE / 180) * Math.PI
     let range = Math.PI - minBounceAngle * 2
     let angle = Math.random() * range + minBounceAngle
-    applyBallSpeed(angle)
+    applyBallSpeed(pupSticky ? Math.PI / 2 : angle)
     audPaddle.play()
     return true
 }
@@ -368,18 +400,24 @@ function updateBall() {
     if (ball.y > paddle.y - paddle.h * 0.5 - ball.h * 0.5 &&
         ball.y < paddle.y + paddle.h * 0.5 + ball.h * 0.5 &&
         ball.x > paddle.x - paddle.w * 0.5 - ball.w * 0.5 &&
-        ball.x < paddle.x + paddle.w * 0.5 + ball.w * 0.5) {
-        ball.y = paddle.y - paddle.h * 0.5 - ball.h * 0.5
-        ball.yV = -ball.yV
+        ball.x < paddle.x + paddle.w * 0.5 + ball.w * 0.5
+    ) {
+        ball.y = paddle.y - paddle.h * 0.5 - ball.h * 0.5 
         audPaddle.play()
-        spinBall()
+        if (pupSticky) {
+            ball.xV = 0
+            ball.yV = 0
+        } else {
+            ball.yV = -ball.yV
+            spinBall()
+        }
     }
     if (ball.y > canvasEl.height) {
         outOfBounds()
     }
-    if (ball.yV == 0) {
-        ball.x = paddle.x
-    }
+    // if (ball.yV == 0) {
+    //     ball.x = paddle.x
+    // }
 }
 
 function updateBricks() {
@@ -393,8 +431,19 @@ function updateBricks() {
                 } else {
                     ball.y = bricks[i][j].top - ball.h * 0.5
                 }
+
+                if (Math.random() <= PUP_CHANCE) {
+                    let px = bricks[i][j].left + bricks[i][j].w / 2
+                    let py = bricks[i][j].top + bricks[i][j].h / 2
+                    let pSize = bricks[i][j].w * 0.4
+                    let pKeys = Object.keys(PupType)
+                    let pKey = pKeys[Math.floor(Math.random() * pKeys.length)]
+                    pups.push(new PowerUp(px, py, pSize, PupType[pKey]))
+                }
                 bricks[i][j] = null
-                ball.yV = -ball.yV
+                if (!pupSuper) {
+                    ball.yV = -ball.yV
+                }
                 numBricks--
                 audBrick.play()
                 spinBall()
@@ -424,11 +473,62 @@ function updatePaddle() {
             movePaddle(DIRECTION.STOP)
         }
     }
+    let lastPaddleX = paddle.x
     paddle.x += (paddle.xV / 1000) * 20
     if (paddle.x < wall + paddle.w / 2) {
         paddle.x = wall + paddle.w / 2
     } else if (paddle.x > canvasEl.width - wall - paddle.w / 2) {
         paddle.x = canvasEl.width - wall - paddle.w / 2
+    }
+    if (ball.yV == 0) {
+        ball.x += paddle.x - lastPaddleX
+    }
+    for (i = pups.length - 1; i >= 0; i--) {
+        if (
+            pups[i].x + pups[i].w * 0.5 > paddle.x - paddle.w * 0.5 &&
+            pups[i].x - pups[i].w * 0.5 < paddle.x + paddle.w * 0.5 &&
+            pups[i].y + pups[i].h * 0.5 > paddle.y - paddle.h * 0.5 &&
+            pups[i].y + pups[i].h * 0.5 < paddle.y + paddle.h * 0.5
+        ) {
+            switch (pups[i].type) {
+                case PupType.EXTENSION:
+                    if (pupExtension) {
+                        score += PUP_BONUS
+                    } else {
+                        pupExtension = true
+                        paddle.w *= 2
+                    }
+                    break
+                case PupType.LIFE:
+                    lives++
+                    break
+                case PupType.STICKY:
+                    if (pupSticky) {
+                        score += PUP_BONUS
+                    } else {
+                        pupSticky = true
+                    }
+                    break
+                case PupType.SUPER:
+                    if (pupSuper) {
+                        score += PUP_BONUS
+                    } else {
+                        pupSuper= true
+                    }
+                    break
+            }
+            pups.splice(i, 1)
+            audPowerup.play()
+        }
+    }
+}
+
+function updatePups() {
+    for (let i = pups.length - 1; i >= 0; i--) {
+        pups[i].y += (pups[i].yV / 1000) * 20
+        if (pups[i].y - pups[i].h * 0.5 > height) {
+            pups.splice(i, 1)
+       }
     }
 }
 
@@ -476,7 +576,7 @@ class Brick {
                 ballLeft < this.right &&
                 this.bottom > ballTop &&
                 ballBottom > this.top
-                )
+            )
         }
     }
 }
@@ -489,6 +589,18 @@ class Paddle {
         this.y = canvasEl.height - this.h * 3
         this.speed = paddleSpeed * width
         this.xV = 0
+    }
+}
+
+class PowerUp {
+    constructor(x, y, size, type) {
+        this.w = size
+        this.h = size
+        this.x = x 
+        this.y = y
+        this.type = type
+        this.yV = PUP_SPEED * height
+
     }
 }
 
